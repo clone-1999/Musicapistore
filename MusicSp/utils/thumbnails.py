@@ -5,17 +5,10 @@ import logging
 import os
 import aiofiles
 import aiohttp
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageFilter, ImageDraw, ImageFont
+from py_yt import VideosSearch
 
 logging.basicConfig(level=logging.INFO)
-
-def changeImageSize(maxWidth, maxHeight, image):
-    widthRatio = maxWidth / image.size[0]
-    heightRatio = maxHeight / image.size[1]
-    newWidth = int(widthRatio * image.size[0])
-    newHeight = int(heightRatio * image.size[1])
-    newImage = image.resize((newWidth, newHeight))
-    return newImage
 
 async def gen_thumb(videoid: str):
     try:
@@ -42,47 +35,67 @@ async def gen_thumb(videoid: str):
                         await f.write(await resp.read())
                     
         image_path = f"cache/thumb{videoid}.png"
-        youtube = Image.open(image_path)
-        
-        
-        background = changeImageSize(1280, 720, youtube)
-        background = background.convert("RGB")
-        
         
         # -----------------------------------------------------------------------
+        # ပုံစံအသစ်: မှုန်ဝါးဝါး နောက်ခံ + မူရင်းပုံအလယ် + သင့်နာမည်
+        # -----------------------------------------------------------------------
+        img = Image.open(image_path).convert("RGB")
+        
+        # 1. နောက်ခံအတွက် ပုံကို 1280x720 ဆွဲချဲ့ပြီး Blur (မှုန်ဝါး) လုပ်ခြင်း
+        background = img.resize((1280, 720))
+        background = background.filter(ImageFilter.GaussianBlur(20))
+        
+        # ပုံပိုမိုမှောင်ပြီး ပေါ်လွင်စေရန် အမည်းစက္ကူပါးလေး အုပ်ခြင်း
+        darker = Image.new("RGB", background.size, (0, 0, 0))
+        background = Image.blend(background, darker, 0.4)
+
+        # 2. မူရင်းပုံကို အချိုးအစားမပျက်ဘဲ အရွယ်အစားချိန်ခြင်း
+        img.thumbnail((700, 700))
+        
+        # 3. နောက်ခံပေါ်တွင် မူရင်းပုံကို အလယ်တည့်တည့်သို့ တင်ခြင်း
+        w, h = img.size
+        x_offset = (1280 - w) // 2
+        y_offset = (720 - h) // 2
+        background.paste(img, (x_offset, y_offset))
+        
+        # -----------------------------------------------------------------------
+        # 4. 
+        # ----------------------------------------------------
         draw = ImageDraw.Draw(background)
         
+        # 
+        name_to_draw = "@HANTHAR999" 
         
-        font_path = "assets/font.ttf" 
-        
+        # Font သတ်မှတ်ခြင်း (Load default ကိုသုံးထားသောကြောင့် အင်္ဂလိပ်စာအတွက် အဆင်ပြေသည်)
+        # မြန်မာစာ လိုအပ်ပါက အောက်တွင်ဖော်ပြထားသော .ttf လမ်းကြောင်းကို သုံးရပါမည်
         try:
-            title_font = ImageFont.truetype(font_path, 36)
-            name_font = ImageFont.truetype(font_path, 26)
-        except IOError:
-            title_font = ImageFont.load_default()
-            name_font = ImageFont.load_default()
+            # အကယ်၍ သင့်စက်တွင် မြန်မာဖောင့်ဖိုင်ရှိပါက ဤလိုင်းကိုသုံးပါ (ဥပမာ: 'assets/font.ttf')
+            # font = ImageFont.truetype('path/to/your/MyanmarFont.ttf', 36)
+            
+            # လက်ရှိ Font မရှိသေးလျှင် default font သုံးသည် (မြန်မာစာ ပျက်နိုင်သည်)
+            font = ImageFont.load_default()
+        except Exception:
+            font = ImageFont.load_default()
 
-        
-        text_x = 750
-        title_y = 280
-        name_y = 340
-        
-        
-        draw.text((text_x, title_y), "Playing Your Requested Song", font=title_font, fill=(255, 255, 255))
-        
-        
-        your_name = "@HANTHAR999" 
-        draw.text((text_x, name_y), f"By: {your_name}", font=name_font, fill=(0, 255, 128)) # အစိမ်းရောင် သို့မဟုတ် လိမ္မော်ရောင်သုံးနိုင်သည်
+        # နာမည်ရဲ့ အတိုင်းအတာကို တိုင်းတာခြင်း (အလယ်ဗဟိုထားရန်)
+        # (Load Default Font အတွက် textlength မရနိုင်ပါက အောက်ပါအတိုင်း hardcode တန်ဖိုးသုံးနိုင်သည်)
+        try:
+            bbox = draw.textbbox((0, 0), name_to_draw, font=font)
+            text_width = bbox[2] - bbox[0]
+            # text_height = bbox[3] - bbox[1]
+        except AttributeError:
+            # Pillow version အဟောင်းများအတွက်
+            text_width = draw.textlength(name_to_draw, font=font)
 
-        # 3. Assets ထဲက Play Icon ကို ထည့်လိုပါက (Icon ဖိုင်ရှိနေလျှင်)
-        icon_path = "assets/play_icons.png"
-        if os.path.exists(icon_path):
-            play_icon = Image.open(icon_path).convert("RGBA")
-            play_icon = play_icon.resize((80, 80)) 
-            background.paste(play_icon, (text_x, 420), play_icon)
-
+        # 
+        name_x = (1280 - text_width) // 2
+        name_y = 630 
+        
+        
+        draw.text((name_x, name_y), name_to_draw, font=font, fill=(255, 255, 255))
+        
         # -----------------------------------------------------------------------
-        
+
         if os.path.exists(image_path):
             os.remove(image_path)
             
