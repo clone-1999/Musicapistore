@@ -26,7 +26,6 @@ from MusicSp.logging import LOGGER
 
 # --- Initialization calls ---
 dirr()
-git()
 dbb()
 heroku()
 
