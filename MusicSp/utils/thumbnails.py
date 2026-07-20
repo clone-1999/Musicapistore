@@ -61,7 +61,7 @@ async def gen_thumb(videoid: str):
         name_to_draw = "@HANTHAR999" 
         
         try:
-            font = ImageFont.truetype('assets/font.ttf', 50)
+            font = ImageFont.truetype('assets/font.ttf', 100)
         except Exception:
             font = ImageFont.load_default()
 
