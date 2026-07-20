@@ -35,57 +35,52 @@ async def gen_thumb(videoid: str):
                         await f.write(await resp.read())
                     
         image_path = f"cache/thumb{videoid}.png"
-        
-        # -----------------------------------------------------------------------
-        # ပုံစံအသစ်: မှုန်ဝါးဝါး နောက်ခံ + မူရင်းပုံအလယ် + သင့်နာမည်
-        # -----------------------------------------------------------------------
         img = Image.open(image_path).convert("RGB")
         
-        # 1. နောက်ခံအတွက် ပုံကို 1280x720 ဆွဲချဲ့ပြီး Blur (မှုန်ဝါး) လုပ်ခြင်း
+        # 1. နောက်ခံအတွက် ပုံကို 1280x720 ဖြည့်ပြီး Blur (မှုန်ဝါး) လုပ်ခြင်း
         background = img.resize((1280, 720))
-        background = background.filter(ImageFilter.GaussianBlur(20))
+        background = background.filter(ImageFilter.GaussianBlur(25))
         
-        # ပုံပိုမိုမှောင်ပြီး ပေါ်လွင်စေရန် အမည်းစက္ကူပါးလေး အုပ်ခြင်း
+        # နောက်ခံကို အနည်းငယ်မှောင်စေခြင်း (စာသားနှင့် ပုံပေါ်လွင်စေရန်)
         darker = Image.new("RGB", background.size, (0, 0, 0))
-        background = Image.blend(background, darker, 0.4)
+        background = Image.blend(background, darker, 0.5)
 
-        # 2. မူရင်းပုံကို အချိုးအစားမပျက်ဘဲ အရွယ်အစားချိန်ခြင်း
-        img.thumbnail((900, 900))
+        # 2. ပုံအလယ်က အဓိကပုံကို အမည်းကွက်မပေါ်စေဘဲ 1280x720 မျက်နှာပြင်ပေါ်သို့ အပြည့်အစုံ ဖြန့်ကျက်ခြင်း (Cover Mode)
+        # အစင်းကြောင်းများ မပေါ်စေရန် Image.Resampling.LANCZOS ကို သုံးထားသည်
+        img_resized = img.resize((1280, 720), Image.Resampling.LANCZOS)
         
-        # 3. နောက်ခံပေါ်တွင် မူရင်းပုံကို အလယ်တည့်တည့်သို့ တင်ခြင်း
-        w, h = img.size
-        x_offset = (1280 - w) // 2
-        y_offset = (720 - h) // 2 - 20  # ပုံကို အနည်းငယ်အပေါ်သို့ တင်ပေးထားသည် (နာမည်နေရာလွတ်ရန်)
-        background.paste(img, (x_offset, y_offset))
-        
-        # -----------------------------------------------------------------------
-        # 4. နာမည်နှင့် ဖောင့်ပိုင်းဆိုင်ရာ ပြင်ဆင်ချက်
-        # -----------------------------------------------------------------------
+        # နောက်ခံပေါ်သို့ အပြည့်တင်ခြင်း (အမည်းကွက်လုံးဝ မရှိတော့ပါ)
+        background.paste(img_resized, (0, 0))
+
+        # ပုံပေါ်တွင် အလွှာပါးလေး ထပ်အုပ်ပေးခြင်းဖြင့် စာသားများ ပိုထင်ရှားစေခြင်း
+        overlay = Image.new("RGBA", background.size, (0, 0, 0, 80))
+        background = Image.alpha_composite(background.convert("RGBA"), overlay).convert("RGB")
+
+        # 3. နာမည်ထည့်သွင်းခြင်း
         draw = ImageDraw.Draw(background)
-        
         name_to_draw = "@HANTHAR999" 
         
-        # GitHub ထဲက assets/font.ttf ကို သုံးပြီး ဆိုဒ်ကို ကြီးထားသည် (ဥပမာ: 65)
         try:
-            font = ImageFont.truetype('assets/font.ttf', 65) # <--- ဆိုဒ်ကြီးလိုချင်ရင် ဒီကိန်းဂဏန်းကို တိုးပါ
+            font = ImageFont.truetype('assets/font.ttf', 50)
         except Exception:
             font = ImageFont.load_default()
 
-        # နာမည်ရဲ့ အတိုင်းအတာကို တိုင်းတာခြင်း (အလယ်ဗဟိုထားရန်)
         try:
             bbox = draw.textbbox((0, 0), name_to_draw, font=font)
             text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
         except AttributeError:
             text_width = draw.textlength(name_to_draw, font=font)
+            text_height = 40
 
-        # နေရာချခြင်း (ပုံအောက်နားတွင် အလယ်ဗဟိုကျကျ ပေါ်စေရန်)
-        name_x = (1280 - text_width) // 2
-        name_y = y_offset + h + 10  # ပုံအောက်စပ်နားတွင် အလိုအလျောက် နေရာကျစေသည်
+        # နာမည်ကို ညာဘက်အောက်ထောင့် (သို့မဟုတ်) ကြည့်ကောင်းမည့်နေရာတွင် ချելရန်
+        name_x = 1280 - text_width - 50  # ညာဘက်စွန်းမှ ကွာဟချက်
+        name_y = 720 - text_height - 40  # အောက်ခြေမှ ကွာဟချက်
         
+        # စာသားနောက်ခံ ပိုပေါ်လွင်စေရန် အရိပ်သဘောမျိုး အမည်းရောင်လေးဖြင့် အစွန်းထုတ်ရေးခြင်း
+        draw.text((name_x + 2, name_y + 2), name_to_draw, font=font, fill=(0, 0, 0))
         draw.text((name_x, name_y), name_to_draw, font=font, fill=(255, 255, 255))
         
-        # -----------------------------------------------------------------------
-
         if os.path.exists(image_path):
             os.remove(image_path)
             
