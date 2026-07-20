@@ -50,47 +50,37 @@ async def gen_thumb(videoid: str):
         background = Image.blend(background, darker, 0.4)
 
         # 2. မူရင်းပုံကို အချိုးအစားမပျက်ဘဲ အရွယ်အစားချိန်ခြင်း
-        img.thumbnail((700, 700))
+        img.thumbnail((900, 900))
         
         # 3. နောက်ခံပေါ်တွင် မူရင်းပုံကို အလယ်တည့်တည့်သို့ တင်ခြင်း
         w, h = img.size
         x_offset = (1280 - w) // 2
-        y_offset = (720 - h) // 2
+        y_offset = (720 - h) // 2 - 20  # ပုံကို အနည်းငယ်အပေါ်သို့ တင်ပေးထားသည် (နာမည်နေရာလွတ်ရန်)
         background.paste(img, (x_offset, y_offset))
         
         # -----------------------------------------------------------------------
-        # 4. 
-        # ----------------------------------------------------
+        # 4. နာမည်နှင့် ဖောင့်ပိုင်းဆိုင်ရာ ပြင်ဆင်ချက်
+        # -----------------------------------------------------------------------
         draw = ImageDraw.Draw(background)
         
-        # 
         name_to_draw = "@HANTHAR999" 
         
-        # Font သတ်မှတ်ခြင်း (Load default ကိုသုံးထားသောကြောင့် အင်္ဂလိပ်စာအတွက် အဆင်ပြေသည်)
-        # မြန်မာစာ လိုအပ်ပါက အောက်တွင်ဖော်ပြထားသော .ttf လမ်းကြောင်းကို သုံးရပါမည်
+        # GitHub ထဲက assets/font.ttf ကို သုံးပြီး ဆိုဒ်ကို ကြီးထားသည် (ဥပမာ: 65)
         try:
-            # အကယ်၍ သင့်စက်တွင် မြန်မာဖောင့်ဖိုင်ရှိပါက ဤလိုင်းကိုသုံးပါ (ဥပမာ: 'assets/font.ttf')
-            # font = ImageFont.truetype('path/to/your/MyanmarFont.ttf', 36)
-            
-            # လက်ရှိ Font မရှိသေးလျှင် default font သုံးသည် (မြန်မာစာ ပျက်နိုင်သည်)
-            font = ImageFont.load_default()
+            font = ImageFont.truetype('assets/font.ttf', 65) # <--- ဆိုဒ်ကြီးလိုချင်ရင် ဒီကိန်းဂဏန်းကို တိုးပါ
         except Exception:
             font = ImageFont.load_default()
 
         # နာမည်ရဲ့ အတိုင်းအတာကို တိုင်းတာခြင်း (အလယ်ဗဟိုထားရန်)
-        # (Load Default Font အတွက် textlength မရနိုင်ပါက အောက်ပါအတိုင်း hardcode တန်ဖိုးသုံးနိုင်သည်)
         try:
             bbox = draw.textbbox((0, 0), name_to_draw, font=font)
             text_width = bbox[2] - bbox[0]
-            # text_height = bbox[3] - bbox[1]
         except AttributeError:
-            # Pillow version အဟောင်းများအတွက်
             text_width = draw.textlength(name_to_draw, font=font)
 
-        # 
+        # နေရာချခြင်း (ပုံအောက်နားတွင် အလယ်ဗဟိုကျကျ ပေါ်စေရန်)
         name_x = (1280 - text_width) // 2
-        name_y = 630 
-        
+        name_y = y_offset + h + 10  # ပုံအောက်စပ်နားတွင် အလိုအလျောက် နေရာကျစေသည်
         
         draw.text((name_x, name_y), name_to_draw, font=font, fill=(255, 255, 255))
         
