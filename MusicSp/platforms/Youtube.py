@@ -6,14 +6,28 @@ import yt_dlp
 from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message
 from py_yt import VideosSearch, Playlist
-import aiohttp
-
-# 1. ဤနေရာတွင် https:// အပြည့်အစုံ ထည့်ပေးပါ
-API_URL = os.environ.get("MusicSp_API_URL", "https://key-production-78aa.up.railway.app/api/download")
-
-API_KEY = os.environ.get("MusicSp_API_KEY", "khithlainhtetapi2019") 
 
 DOWNLOAD_DIR = "downloads"
+MAX_CACHED_FILES = 500  
+
+
+def clean_old_files():
+    """downloads/ ထဲတွင် ဖိုင် ၅၀၀ ပြည့်ပါက အဟောင်းများကို အလိုအလျောက်ဖျက်မည်"""
+    if not os.path.exists(DOWNLOAD_DIR):
+        return
+    
+    files = [os.path.join(DOWNLOAD_DIR, f) for f in os.listdir(DOWNLOAD_DIR)]
+    
+    files.sort(key=os.path.getmtime)
+    
+    # အရေအတွက် ၅၀၀ ထက် ကျော်လွန်နေပါက အဟောင်းများကို ဖျက်မည်
+    while len(files) >= MAX_CACHED_FILES:
+        oldest_file = files.pop(0)
+        try:
+            if os.path.exists(oldest_file):
+                os.remove(oldest_file)
+        except Exception:
+            pass
 
 
 def time_to_seconds(time):
@@ -28,46 +42,42 @@ async def download_song(link: str) -> str:
 
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
     file_path = os.path.join(DOWNLOAD_DIR, f"{video_id}.mp3")
+    
+    
     if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
         return file_path
 
+    
+    clean_old_files()
+
     try:
-        # 2. Header ထဲတွင် x-api-key ထည့်သွင်းပေးခြင်း
-        headers = {
-            "x-api-key": API_KEY
-        }
-        params = {
-            "url": link,
-            "type": "audio"
+        ydl_opts = {
+            "format": "bestaudio[ext=m4a]/bestaudio/best",
+            "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
+            "geo_bypass": True,
+            "nocheckcertificate": True,
+            "quiet": True,
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }
+            ],
         }
         
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                API_URL,
-                headers=headers,
-                params=params,
-                timeout=aiohttp.ClientTimeout(total=300)
-            ) as resp:
-                if resp.status != 200:
-                    return None
-                
-                # JSON Response လာမလား သို့မဟုတ် တိုက်ရိုက် File လား စစ်ဆေးခြင်း
-                content_type = resp.headers.get("Content-Type", "")
-                if "application/json" in content_type:
-                    data = await resp.json()
-                    if data.get("status") == "success":
-                        file_url = f"https://key-production-78aa.up.railway.app{data.get('file_url')}"
-                        async with session.get(file_url) as file_resp:
-                            if file_resp.status == 200:
-                                with open(file_path, "wb") as f:
-                                    async for chunk in file_resp.content.iter_chunked(131072):
-                                        f.write(chunk)
-                
+        loop = asyncio.get_running_loop()
+        def run_ytdl():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([link])
+
+        await loop.run_in_executor(None, run_ytdl)
+
         if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
             return file_path
         return None
     except Exception as e:
-        print(f"Download Song Error: {e}")
+        print(f"Direct Download Song Error: {e}")
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
@@ -83,51 +93,41 @@ async def download_video(link: str) -> str:
 
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
     file_path = os.path.join(DOWNLOAD_DIR, f"{video_id}.mp4")
+    
+    # Caching စစ်ဆေးခြင်း
     if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
         return file_path
 
+    # အသစ်မဒေါင်းခင် ဖိုင်အရေအတွက် ၅၀၀ ပြည့်နေမပြည့် စစ်ဆေးပြီး ဖျက်မည်
+    clean_old_files()
+
     try:
-        headers = {
-            "x-api-key": API_KEY
-        }
-        params = {
-            "url": link,
-            "type": "video"
+        ydl_opts = {
+            "format": "best[ext=mp4]/best",
+            "outtmpl": os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s"),
+            "geo_bypass": True,
+            "nocheckcertificate": True,
+            "quiet": True,
         }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                API_URL,
-                headers=headers,
-                params=params,
-                timeout=aiohttp.ClientTimeout(total=600)
-            ) as resp:
-                if resp.status != 200:
-                    return None
-                
-                content_type = resp.headers.get("Content-Type", "")
-                if "application/json" in content_type:
-                    data = await resp.json()
-                    if data.get("status") == "success":
-                        file_url = f"https://key-production-78aa.up.railway.app{data.get('file_url')}"
-                        async with session.get(file_url) as file_resp:
-                            if file_resp.status == 200:
-                                with open(file_path, "wb") as f:
-                                    async for chunk in file_resp.content.iter_chunked(131072):
-                                        f.write(chunk)
-                                        
+        loop = asyncio.get_running_loop()
+        def run_ytdl():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([link])
+
+        await loop.run_in_executor(None, run_ytdl)
+
         if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
             return file_path
         return None
     except Exception as e:
-        print(f"Download Video Error: {e}")
+        print(f"Direct Download Video Error: {e}")
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
             except Exception:
                 pass
         return None
-
 
 
 class YouTubeAPI:
