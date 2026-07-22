@@ -84,7 +84,7 @@ async def gen_thumb(videoid: str):
         # 3. နာမည် အပြည့်အစုံပေါ်စေရန် နေရာအကွာအဝေးကို ချိန်ညှိပေးခြင်း
         draw = ImageDraw.Draw(background)
         try:
-            font_credit = ImageFont.truetype('assets/font.ttf', 30)
+            font_credit = ImageFont.truetype('assets/font.ttf', 80)
         except Exception:
             font_credit = ImageFont.load_default()
 
