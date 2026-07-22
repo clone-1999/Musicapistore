@@ -54,13 +54,13 @@ async def gen_thumb(videoid: str):
             
         youtube = Image.open(image_path).convert("RGB")
         
-        # 1. နောက်ခံအတွက် ပုံကို 1280x720 ပြောင်းပြီး Blur လုပ်ခြင်း (နောက်ခံဝါးရန်)
+        # 1. နောက်ခံဝါး (Blur Background)
         bg_img = changeImageSize(1280, 720, youtube)
         background = bg_img.filter(ImageFilter.GaussianBlur(30))
         darken = Image.new("RGBA", (1280, 720), (10, 10, 15, 180))
         background = Image.alpha_composite(background.convert("RGBA"), darken).convert("RGB")
 
-        # 2. အလယ်တည့်တည့်မှာ ပုံကို ဘောင် (Border) လေးနဲ့ သပ်ရပ်ကြည်လင်စွာ ဖော်ပြခြင်း
+        # 2. အလယ်တည့်တည့်က ပုံနှင့် ဘောင်အဖြူ (White Border)
         target_w, target_h = 800, 450
         orig_w, orig_h = youtube.size
         
@@ -73,7 +73,6 @@ async def gen_thumb(videoid: str):
             
         foreground = img_cropped.resize((target_w, target_h), Image.Resampling.LANCZOS)
         
-        # ဘောင်အဖြူ (White Border & Shadow Effect)
         border_size = 10
         bordered_img = Image.new("RGB", (target_w + border_size * 2, target_h + border_size * 2), (255, 255, 255))
         bordered_img.paste(foreground, (border_size, border_size))
@@ -82,18 +81,18 @@ async def gen_thumb(videoid: str):
         pos_y = (720 - bordered_img.size[1]) // 2 - 20
         background.paste(bordered_img, (pos_x, pos_y))
 
-        # 3. ဖောင့်ချိတ်ဆက်ခြင်းနှင့် `@HANTHAR999` နာမည်ထည့်ခြင်း
+        # 3. နာမည် အပြည့်အစုံပေါ်စေရန် နေရာအကွာအဝေးကို ချိန်ညှိပေးခြင်း
         draw = ImageDraw.Draw(background)
         try:
-            font_credit = ImageFont.truetype('assets/font.ttf', 32)
+            font_credit = ImageFont.truetype('assets/font.ttf', 30)
         except Exception:
             font_credit = ImageFont.load_default()
 
         credit_text = "@HANTHAR999"
         
-        # ညာဘက်အောက်ထောင့်တွင် Shadow နှင့်အတူ ထည့်ခြင်း
-        draw.text((1242, 672), credit_text, font=font_credit, fill=(0, 0, 0))
-        draw.text((1240, 670), credit_text, font=font_credit, fill=(255, 255, 255), anchor="rt")
+        # ညာဘက်အစွန်းမှ လုံလောက်သော ကွာဝေးချက် (x=1230) တွင် ထားရှိခြင်းဖြင့် တစ်ဝက်တစ်ပျက်ဖြစ်ခြင်းကို ကာကွယ်ပေးသည်
+        draw.text((1232, 662), credit_text, font=font_credit, fill=(0, 0, 0))
+        draw.text((1230, 660), credit_text, font=font_credit, fill=(255, 255, 255), anchor="rt")
 
         if os.path.exists(image_path):
             os.remove(image_path)
