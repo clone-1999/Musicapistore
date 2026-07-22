@@ -54,10 +54,10 @@ async def gen_thumb(videoid: str):
             
         youtube = Image.open(image_path).convert("RGB")
         
-        # 1. နောက်ခံဝါး (Blur Background)
+        # 1. နောက်ခံကို ပိုပြီး သိသိသာသာ ဝါးပေးခြင်း (Blur Background - 50 तक တိုးထားသည်)
         bg_img = changeImageSize(1280, 720, youtube)
-        background = bg_img.filter(ImageFilter.GaussianBlur(30))
-        darken = Image.new("RGBA", (1280, 720), (10, 10, 15, 180))
+        background = bg_img.filter(ImageFilter.GaussianBlur(50))
+        darken = Image.new("RGBA", (1280, 720), (10, 10, 15, 190))
         background = Image.alpha_composite(background.convert("RGBA"), darken).convert("RGB")
 
         # 2. အလယ်တည့်တည့်က ပုံနှင့် ဘောင်အဖြူ (White Border)
@@ -81,18 +81,33 @@ async def gen_thumb(videoid: str):
         pos_y = (720 - bordered_img.size[1]) // 2 - 20
         background.paste(bordered_img, (pos_x, pos_y))
 
-        # 3. နာမည် အပြည့်အစုံပေါ်စေရန် နေရာအကွာအဝေးကို ချိန်ညှိပေးခြင်း
+        # 3. System Font ကို တိုက်ရိုက်သုံးခြင်း (Assets မလိုတော့ပါ)
         draw = ImageDraw.Draw(background)
-        try:
-            font_credit = ImageFont.truetype('assets/font.ttf', 80)
-        except Exception:
+        font_credit = None
+        
+        # Linux/Windows စနစ်များတွင် အများဆုံးပါတတ်သော System Fonts များကို အစဉ်လိုက် ရှာဖွေသုံးမည်
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "arialbd.ttf",
+            "arial.ttf"
+        ]
+        
+        for fpath in font_paths:
+            try:
+                font_credit = ImageFont.truetype(fpath, 32)
+                break
+            except Exception:
+                continue
+                
+        if font_credit is None:
             font_credit = ImageFont.load_default()
 
         credit_text = "999_CORES @HANTHAR999"
         
-        # ညာဘက်အစွန်းမှ လုံလောက်သော ကွာဝေးချက် (x=1230) တွင် ထားရှိခြင်းဖြင့် တစ်ဝက်တစ်ပျက်ဖြစ်ခြင်းကို ကာကွယ်ပေးသည်
-        draw.text((642, 662), credit_text, font=font_credit, fill=(0, 0, 0))
-        draw.text((640, 660), credit_text, font=font_credit, fill=(255, 255, 255), anchor="rt")
+        # ညာဘက်အောက်ထောင့်တွင် စာသားပြတ်တောက်မှု မရှိစေရန် လှပစွာ ဖော်ပြခြင်း
+        draw.text((1232, 662), credit_text, font=font_credit, fill=(0, 0, 0))
+        draw.text((1230, 660), credit_text, font=font_credit, fill=(255, 255, 255), anchor="rt")
 
         if os.path.exists(image_path):
             os.remove(image_path)
