@@ -7,15 +7,15 @@ import textwrap
 
 logging.basicConfig(level=logging.INFO)
 
-async def gen_thumb(videoid: str, song_title: str):
+async def gen_thumb(videoid: str, song_title: str, artist_name: str = "@HANTHAR999"):
     try:
-        cache_path = f"cache/{videoid}_v10.png"
+        cache_path = f"cache/{videoid}_apple_music.png"
         if os.path.isfile(cache_path):
             return cache_path
 
         os.makedirs("cache", exist_ok=True)
 
-        # YouTube Thumbnail Direct URL (Error လုံးဝမဖြစ်စေရန်)
+        # YouTube Thumbnail Direct URL
         thumbnail_url = f"https://img.youtube.com/vi/{videoid}/maxresdefault.jpg"
 
         async with aiohttp.ClientSession() as session:
@@ -36,129 +36,110 @@ async def gen_thumb(videoid: str, song_title: str):
         image_path = f"cache/thumb_{videoid}.png"
         original_img = Image.open(image_path).convert("RGB")
         
-        # 1. နောက်ခံ (Background): Blur & Darken
+        # 1. အပြင်ဘက် နောက်ခံအထွေထွေ (Blur Background)
         bg_width, bg_height = 1280, 720
+        scaled_bg = original_img.resize((bg_width, bg_height), Image.Resampling.LANCZOS)
+        background = scaled_bg.filter(ImageFilter.GaussianBlur(35))
+        darken = Image.new("RGBA", (bg_width, bg_height), (10, 10, 15, 200))
+        background = Image.alpha_composite(background.convert("RGBA"), darken).convert("RGB")
+
+        # 2. ပုံစံတူ Apple Music Player Card (အဓိက အမည်းရောင် Box ကြီး)
+        # Card Size: 1060 x 560 (အလယ်တည့်တည့်မှာ ထားမည်)
+        card_w, card_h = 1060, 560
+        card_x = (bg_width - card_w) // 2
+        card_y = (bg_height - card_h) // 2
+        
+        card_layer = Image.new("RGBA", (bg_width, bg_height), (0, 0, 0, 0))
+        card_draw = ImageDraw.Draw(card_layer)
+        
+        # Apple Music Player လိုမျိုး ထောင့်ဝိုင်းဝိုင်းနဲ့ အမည်းရောင် Card
+        card_draw.rounded_rectangle(
+            [card_x, card_y, card_x + card_w, card_y + card_h],
+            radius=35,
+            fill=(25, 25, 30, 240),
+            outline=(255, 255, 255, 30),
+            width=2
+        )
+        
+        # 3. ဘယ်ဘက်ခြမ်း Square Thumbnail (Album Art)
+        # Size: 440 x 440
+        thumb_size = 440
+        thumb_x = card_x + 50
+        thumb_y = card_y + 60
+        
         orig_w, orig_h = original_img.size
-        aspect = orig_w / orig_h
+        min_dim = min(orig_w, orig_h)
+        left = (orig_w - min_dim) // 2
+        top = (orig_h - min_dim) // 2
+        square_img = original_img.crop((left, top, left + min_dim, top + min_dim))
+        album_art = square_img.resize((thumb_size, thumb_size), Image.Resampling.LANCZOS)
         
-        if aspect > bg_width / bg_height:
-            new_w = bg_width
-            new_h = int(new_w / aspect)
-        else:
-            new_h = bg_height
-            new_w = int(new_h * aspect)
-            
-        scaled_bg = original_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-        background = Image.new("RGB", (bg_width, bg_height), (15, 15, 20))
-        background.paste(scaled_bg, ((bg_width - new_w) // 2, (bg_height - new_h) // 2))
+        # Album Art ကို ထောင့်အနည်းငယ်ဝိုင်းစေရန် Mask လုပ်ခြင်း
+        mask = Image.new("L", (thumb_size, thumb_size), 0)
+        mask_draw = ImageDraw.Draw(mask)
+        mask_draw.rounded_rectangle([0, 0, thumb_size, thumb_size], radius=16, fill=255)
         
-        background = background.filter(ImageFilter.GaussianBlur(25))
-        dark_overlay = Image.new("RGBA", (bg_width, bg_height), (0, 0, 0, 160))
-        background = Image.alpha_composite(background.convert("RGBA"), dark_overlay).convert("RGB")
-
-        # 2. ပင်မပုံ (Foreground Image): အလယ်တွင် ဘောင်အဖြူ (White Border) ဖြင့် လှပစွာပေါ်စေရန်
-        target_w, target_h = 680, 382
+        card_layer.paste(album_art, (thumb_x, thumb_y), mask)
         
-        if orig_w / orig_h > target_w / target_h:
-            w_crop = int(orig_h * (target_w / target_h))
-            img_cropped = original_img.crop(((orig_w - w_crop) // 2, 0, (orig_w + w_crop) // 2, orig_h))
-        else:
-            h_crop = int(orig_w * (target_h / target_w))
-            img_cropped = original_img.crop((0, (orig_h - h_crop) // 2, orig_w, (orig_h + h_crop) // 2))
-            
-        foreground = img_cropped.resize((target_w, target_h), Image.Resampling.LANCZOS)
-        
-        # ပုံပတ်လည်တွင် ဘောင်အဖြူနှင့် အရိပ် (Shadow) ထည့်ခြင်း
-        border_size = 12
-        bordered_img = Image.new("RGB", (target_w + border_size * 2, target_h + border_size * 2), (255, 255, 255))
-        bordered_img.paste(foreground, (border_size, border_size))
-        
-        pos_x = (1280 - bordered_img.size[0]) // 2
-        pos_y = 120 
-        background.paste(bordered_img, (pos_x, pos_y))
-
-        # 3. အောက်ခြေ Music Info Bar (Gradient)
-        bar_height = 150
-        bar_y = 720 - bar_height
-        gradient_layer = Image.new("RGBA", (1280, bar_height), (0, 0, 0, 0))
-        gr_draw = ImageDraw.Draw(gradient_layer)
-        for y in range(bar_height):
-            alpha = int((y / bar_height) * 220) 
-            gr_draw.line([(0, y), (1280, y)], fill=(0, 0, 0, alpha))
-        
-        background = Image.alpha_composite(background.convert("RGBA"), gradient_layer).convert("RGB")
+        background = Image.alpha_composite(background.convert("RGBA"), card_layer).convert("RGB")
         draw = ImageDraw.Draw(background)
 
-        # ဖောင့်ချိတ်ဆက်ခြင်း (မရှိပါက Default သုံးမည်)
+        # Fonts ချိန်ညှိခြင်း
         try:
-            font_title = ImageFont.truetype('assets/font.ttf', 46)
-            font_channel = ImageFont.truetype('assets/font.ttf', 28)
+            font_title = ImageFont.truetype('assets/font.ttf', 36)
+            font_sub = ImageFont.truetype('assets/font.ttf', 24)
+            font_time = ImageFont.truetype('assets/font.ttf', 20)
         except Exception:
             font_title = ImageFont.load_default()
-            font_channel = ImageFont.load_default()
+            font_sub = ImageFont.load_default()
+            font_time = ImageFont.load_default()
 
-        # ဘယ်ဘက်တွင် ပုံဖိုင်မလိုဘဲ တောက်ပြောင်လှပသော Play Button အဝိုင်းနှင့် Triangle ကို ကိုယ်တိုင်ဆွဲခြင်း
-        icon_size = 70
-        icon_x = 55
-        icon_y = bar_y + (bar_height - icon_size) // 2
+        # 4. ညာဘက်ခြမ်း Text များနှင့် Media Controls
+        text_x = thumb_x + thumb_size + 50
+        text_area_w = card_x + card_w - text_x - 50
         
-        icon_layer = Image.new("RGBA", background.size, (0, 0, 0, 0))
-        icon_draw = ImageDraw.Draw(icon_layer)
-        # အဝိုင်းနောက်ခံ
-        icon_draw.ellipse([icon_x, icon_y, icon_x + icon_size, icon_y + icon_size], fill=(255, 255, 255, 45), outline=(255, 255, 255, 120), width=2)
-        # Play Triangle
-        tri_x1 = icon_x + 27
-        tri_y1 = icon_y + 22
-        tri_x2 = icon_x + 27
-        tri_y2 = icon_y + 48
-        tri_x3 = icon_x + 50
-        tri_y3 = icon_y + 35
-        icon_draw.polygon([(tri_x1, tri_y1), (tri_x2, tri_y2), (tri_x3, tri_y3)], fill=(255, 255, 255))
+        # Device Header (ဥပမာ - iPhone 🎧)
+        draw.text((text_x, card_y + 65), "iPhone  🎧", font=font_sub, fill=(150, 150, 160))
         
-        background = Image.alpha_composite(background.convert("RGBA"), icon_layer).convert("RGB")
-        draw = ImageDraw.Draw(background)
-
-        text_start_x = icon_x + icon_size + 25
-
-        # ညာဘက်အောက်ထောင့် Channel Name တိုင်းတာခြင်း
-        channel_name = "@HANTHAR999"
-        try:
-            chan_bbox = draw.textbbox((0, 0), channel_name, font=font_channel)
-            chan_w = chan_bbox[2] - chan_bbox[0]
-        except:
-            chan_w = 150 
-
-        # သီချင်းနာမည် အတိုအကြောင်းချိုးခြင်း
-        wrapped_text = textwrap.fill(song_title, width=38) 
+        # သီချင်းနာမည်
+        draw.text((text_x, card_y + 105), song_title[:32], font=font_title, fill=(255, 255, 255))
         
-        dummy_draw = ImageDraw.Draw(Image.new('RGB', (10,10)))
-        text_h = 0
-        lines = wrapped_text.split('\n')
-        for line in lines:
-            bbox = dummy_draw.textbbox((0, 0), line, font=font_title)
-            text_h += (bbox[3] - bbox[1]) + 6 
+        # Artist / Channel Name
+        draw.text((text_x, card_y + 155), artist_name, font=font_sub, fill=(160, 160, 170))
 
-        text_y = bar_y + (bar_height - text_h) // 2
-
-        # စာသားများ ရေးဆွဲခြင်း (Shadow နှင့်အတူ)
-        shadow_color = (0, 0, 0, 220)
-        current_y = text_y
-        for line in lines:
-            line_bbox = draw.textbbox((0, 0), line, font=font_title)
-            text_x = text_start_x 
-            
-            draw.text((text_x + 2, current_y + 2), line, font=font_title, fill=shadow_color)
-            draw.text((text_x, current_y), line, font=font_title, fill=(255, 255, 255))
-            current_y += (line_bbox[3] - line_bbox[1]) + 6
-
-        # ညာဘက်အောက်ထောင့်တွင် Channel Name ထည့်ခြင်း
-        chan_x = 1280 - chan_w - 50
-        chan_y = bar_y + (bar_height - 30) // 2 
+        # 5. Progress Bar (အလယ်ဗဟို မျဉ်းကြောင်း)
+        bar_y = card_y + 225
+        bar_w = text_area_w
+        bar_h = 6
         
-        draw.text((chan_x + 2, chan_y + 2), channel_name, font=font_channel, fill=shadow_color)
-        draw.text((chan_x, chan_y), channel_name, font=font_channel, fill=(220, 220, 220))
+        # နောက်ခံမီးခိုးရောင်မျဉ်း
+        draw.rounded_rectangle([text_x, bar_y, text_x + bar_w, bar_y + bar_h], radius=3, fill=(70, 70, 80))
+        # လက်ရှိသွားနေသော အဖြူရောင်မျဉ်း (ဥပမာ - 40% ခန့်)
+        progress_w = int(bar_w * 0.4)
+        draw.rounded_rectangle([text_x, bar_y, text_x + progress_w, bar_y + bar_h], radius=3, fill=(240, 240, 240))
+        
+        # အချိန်စာသားများ (1:27 နှင့် -0:55)
+        draw.text((text_x, bar_y + 15), "1:27", font=font_time, fill=(150, 150, 160))
+        draw.text((text_x + bar_w - 45, bar_y + 15), "-0:55", font=font_time, fill=(150, 150, 160))
 
-        # ပုံဟောင်းဖယ်ရှားပြီး အသစ်သိမ်းခြင်း
+        # 6. Media Control Buttons (Backward, Play/Pause, Forward လေးများ ကိုယ်တိုင်ဆွဲခြင်း)
+        ctrl_y = card_y + 350
+        # ခလုတ်များရှိမည့် နေရာကို ညာဘက်ခြမ်း Text Area ထဲတွင် အလယ်တည့်တည့် ပုံစံဖော်မည်
+        center_ctrl_x = text_x + (text_area_w // 2) - 20
+        
+        # Backward Button (◀◀)
+        draw.polygon([(center_ctrl_x - 60, ctrl_y + 18), (center_ctrl_x - 35, ctrl_y + 5), (center_ctrl_x - 35, ctrl_y + 31)], fill=(220, 220, 220))
+        draw.polygon([(center_ctrl_x - 35, ctrl_y + 18), (center_ctrl_x - 10, ctrl_y + 5), (center_ctrl_x - 10, ctrl_y + 31)], fill=(220, 220, 220))
+
+        # Pause / Play Button ( || အစား ဒေါင်လိုက်တိုင်နှစ်ခု - Pause ပုံစံ)
+        draw.rounded_rectangle([center_ctrl_x + 10, ctrl_y + 4, center_ctrl_x + 22, ctrl_y + 32], radius=3, fill=(255, 255, 255))
+        draw.rounded_rectangle([center_ctrl_x + 30, ctrl_y + 4, center_ctrl_x + 42, ctrl_y + 32], radius=3, fill=(255, 255, 255))
+
+        # Forward Button (▶▶)
+        draw.polygon([(center_ctrl_x + 70, ctrl_y + 5), (center_ctrl_x + 70, ctrl_y + 31), (center_ctrl_x + 95, ctrl_y + 18)], fill=(220, 220, 220))
+        draw.polygon([(center_ctrl_x + 95, ctrl_y + 5), (center_ctrl_x + 95, ctrl_y + 31), (center_ctrl_x + 120, ctrl_y + 18)], fill=(220, 220, 220))
+
+        # ပုံဟောင်းဖယ်ရှားပြီး သိမ်းဆည်းခြင်း
         if os.path.exists(image_path):
             os.remove(image_path)
             
@@ -166,5 +147,5 @@ async def gen_thumb(videoid: str, song_title: str):
         return cache_path
 
     except Exception as e:
-        logging.error(f"Error generating music thumbnail for {videoid}: {e}")
+        logging.error(f"Error generating Apple Music style thumbnail for {videoid}: {e}")
         return None
