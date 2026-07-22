@@ -18,9 +18,9 @@ def changeImageSize(maxWidth, maxHeight, image):
     newImage = image.resize((newWidth, newHeight), Image.Resampling.LANCZOS)
     return newImage
 
-async def gen_thumb(videoid: str, song_title: str = "Playing Song"):
+async def gen_thumb(videoid: str, decode: str = "999_CORES"):
     try:
-        cache_path = f"cache/{videoid}_apple_player.png"
+        cache_path = f"cache/{videoid}_v4.png"
         if os.path.isfile(cache_path):
             return cache_path
 
@@ -54,13 +54,13 @@ async def gen_thumb(videoid: str, song_title: str = "Playing Song"):
             
         youtube = Image.open(image_path).convert("RGB")
         
-        # 1. နောက်ခံအတွက် ပုံကို 1280x720 ပြောင်းပြီး Blur လုပ်ခြင်း
+        # 1. Background (Blur & Darken)
         bg_img = changeImageSize(1280, 720, youtube)
         background = bg_img.filter(ImageFilter.GaussianBlur(35))
         darken = Image.new("RGBA", (1280, 720), (10, 10, 15, 210))
         background = Image.alpha_composite(background.convert("RGBA"), darken).convert("RGB")
 
-        # 2. Apple Music Player Card (အမည်းရောင် Box ကြီး)
+        # 2. Apple Music Player Card Box
         card_w, card_h = 1060, 560
         card_x = (1280 - card_w) // 2
         card_y = (720 - card_h) // 2
@@ -76,7 +76,7 @@ async def gen_thumb(videoid: str, song_title: str = "Playing Song"):
             width=2
         )
         
-        # 3. ဘယ်ဘက်ခြမ်း Square Thumbnail (Album Art)
+        # 3. Square Album Art (Thumbnail)
         thumb_size = 440
         thumb_x = card_x + 50
         thumb_y = card_y + 60
@@ -97,7 +97,7 @@ async def gen_thumb(videoid: str, song_title: str = "Playing Song"):
         background = Image.alpha_composite(background.convert("RGBA"), card_layer).convert("RGB")
         draw = ImageDraw.Draw(background)
 
-        # Fonts ချိန်ညှိခြင်း (assets ထဲက font.ttf ကို သုံးသည်)
+        # Fonts
         try:
             font_title = ImageFont.truetype('assets/font.ttf', 36)
             font_sub = ImageFont.truetype('assets/font.ttf', 24)
@@ -107,18 +107,19 @@ async def gen_thumb(videoid: str, song_title: str = "Playing Song"):
             font_sub = ImageFont.load_default()
             font_time = ImageFont.load_default()
 
-        # 4. ညာဘက်ခြမ်း Text များနှင့် Media Controls
+        # 4. Text & Controls Layout
         text_x = thumb_x + thumb_size + 50
         text_area_w = card_x + card_w - text_x - 50
         
-        # Device Header
-        draw.text((text_x, card_y + 65), "iPhone  🎧", font=font_sub, fill=(150, 150, 160))
+        # Device Header & decode / 999_CORES info
+        header_text = f"iPhone ( {decode} ) 🎧"
+        draw.text((text_x, card_y + 65), header_text, font=font_sub, fill=(150, 150, 160))
         
-        # သီချင်းနာမည်
-        draw.text((text_x, card_y + 105), song_title[:32], font=font_title, fill=(255, 255, 255))
+        # Title (သို့ 999_CORES ဖော်ပြချက်)
+        draw.text((text_x, card_y + 105), "Playing Audio", font=font_title, fill=(255, 255, 255))
         
-        # Channel Name / Artist
-        draw.text((text_x, card_y + 155), "@HANTHAR999", font=font_sub, fill=(160, 160, 170))
+        # Artist / 999_CORES
+        draw.text((text_x, card_y + 155), f"Core: {999_CORES}", font=font_sub, fill=(160, 160, 170))
 
         # 5. Progress Bar
         bar_y = card_y + 225
@@ -132,7 +133,7 @@ async def gen_thumb(videoid: str, song_title: str = "Playing Song"):
         draw.text((text_x, bar_y + 15), "1:27", font=font_time, fill=(150, 150, 160))
         draw.text((text_x + bar_w - 45, bar_y + 15), "-0:55", font=font_time, fill=(150, 150, 160))
 
-        # 6. Media Control Buttons (Backward, Pause, Forward)
+        # 6. Media Control Buttons
         ctrl_y = card_y + 350
         center_ctrl_x = text_x + (text_area_w // 2) - 20
         
@@ -151,9 +152,11 @@ async def gen_thumb(videoid: str, song_title: str = "Playing Song"):
         if os.path.exists(image_path):
             os.remove(image_path)
             
-        background.save(cache_path, quality=95)
-        return cache_path
+        background_path = f"cache/{videoid}_v4.png"
+        background.save(background_path, quality=95)
+        
+        return background_path
 
     except Exception as e:
-        logging.error(f"Error generating Apple style thumbnail for video {videoid}: {e}")
+        logging.error(f"Error generating thumbnail for video {videoid}: {e}")
         return None
