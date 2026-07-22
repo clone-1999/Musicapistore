@@ -9,9 +9,12 @@ logging.basicConfig(level=logging.INFO)
 
 async def gen_thumb(videoid: str):
     try:
-        cache_path = f"cache/{videoid}_v4.png"
+        cache_path = f"cache/{videoid}_v5.png"
         if os.path.isfile(cache_path):
             return cache_path
+
+        # Cache folder ရှိမရှိ စစ်ဆေးပြီး ဖန်တီးပေးခြင်း
+        os.makedirs("cache", exist_ok=True)
 
         url = f"https://www.youtube.com/watch?v={videoid}"
         results = VideosSearch(url, limit=1)
@@ -27,36 +30,33 @@ async def gen_thumb(videoid: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(thumbnail) as resp:
                 if resp.status == 200:
-                    filepath = f"cache/thumb{videoid}.png"
+                    filepath = f"cache/thumb_{videoid}.png"
                     async with aiofiles.open(filepath, mode="wb") as f:
                         await f.write(await resp.read())
                     
-        image_path = f"cache/thumb{videoid}.png"
+        image_path = f"cache/thumb_{videoid}.png"
         img = Image.open(image_path).convert("RGB")
         
-        # 1. ရုပ်ထွက်ကောင်းမွန်သော 1280x720 နောက်ခံ (Blur & Darken)
+        # 1. နောက်ခံ (Background): ကို Blur လှလှလေးလုပ်ပြီး အနည်းငယ် မှောင်ပေးခြင်း
         background = img.resize((1280, 720), Image.Resampling.LANCZOS)
-        background = background.filter(ImageFilter.GaussianBlur(30)) # Blur ပိုစူးစေရန်
+        background = background.filter(ImageFilter.GaussianBlur(25))
         
-        # နောက်ခံကို သိသိသာသာ မှောင်ချပေးခြင်း (စာသားပေါ်လွင်စေရန်)
-        darker = Image.new("RGB", background.size, (20, 20, 20))
-        background = Image.blend(background, darker, 0.6)
+        # အရောင်တောက်တောက်နဲ့ ဇိမ်ကျကျဖြစ်အောင် Gradient/Dark Overlay အနည်းငယ်သုံးခြင်း
+        darker = Image.new("RGB", background.size, (10, 10, 15))
+        background = Image.blend(background, darker, 0.45)
 
-        # 2. ပင်မပုံကို အလယ်တွင် Gradient/Shadow ပုံစံဖြင့် ဇိမ်ခံပေါ်လွင်စေရန် (သို့) 16:9 အလှပဆုံး ပုံစံချခြင်း
-        # ဤနေရာတွင် Aspect Ratio မပျက်ဘဲ အလယ်တွင် လှပစွာပေါ်စေရန် သို့မဟုတ် Box အပြည့်တင်ရန်
+        # 2. ပင်မပုံ (Foreground Image): အလယ်တွင် 1280x720 အზომအဆနဲ့ အလှဆုံး ပေါ်လာစေရန်
+        # (အကယ်၍ ပုံအပြည့်မဟုတ်ဘဲ Frame လေးနဲ့ လိုချင်ရင် ဒီနေရာမှာ Size လျှော့လို့ရပါတယ်)
         img_resized = img.resize((1280, 720), Image.Resampling.LANCZOS)
+        
+        # ပုံပေါ်မှာ Gradient Vignette ပုံစံလေးဖြစ်စေရန် (အစွန်းတွေက အမည်းရောင်စပ်သွားအောင်)
         background.paste(img_resized, (0, 0))
 
-        # စာသားနှင့် ပုံပေါ်လွင်ရန် Dark Overlay ထပ်ထည့်ခြင်း
-        overlay = Image.new("RGBA", background.size, (0, 0, 0, 120)) # အမည်းစက်အလွှာ ပိုထူစေရန်
-        background = Image.alpha_composite(background.convert("RGBA"), overlay).convert("RGB")
-
-        # 3. နာမည်နှင့် Watermark ကို ပိုမိုလှပထင်ရှားစွာ ထည့်သွင်းခြင်း
+        # 3. Modern Watermark / Channel Name Badge (ညာဘက်အောက်ထောင့်)
         draw = ImageDraw.Draw(background)
         name_to_draw = "@HANTHAR999" 
         
-        # Font အရွယ်အစားကို ပိုကြီးပေးပြီး လှပစေရန်
-        font_size = 70
+        font_size = 48
         try:
             font = ImageFont.truetype('assets/font.ttf', font_size)
         except Exception:
@@ -71,28 +71,39 @@ async def gen_thumb(videoid: str):
             text_width = draw.textlength(name_to_draw, font=font)
             text_height = font_size
 
-        # အောက်ခြေတွင် Banner ပုံစံ (သို့) ညာဘက်အောက်ထောင့်တွင် ရှင်းရှင်းလင်းလင်းပေါ်ရန်
-        # ဤနေရာတွင် ညာဘက်အောက်ထောင့်၌ နောက်ခံ Box လေးခံပြီး ရေးပေးပါမည် (ဖတ်လို့ကောင်းစေရန်)
-        padding = 20
-        box_x2 = 1280 - 40
-        box_y2 = 720 - 40
-        box_x1 = box_x2 - text_width - (padding * 2)
-        box_y1 = box_y2 - text_height - (padding * 2)
+        # Badge Padding & Position
+        padding_x = 30
+        padding_y = 18
+        box_x2 = 1280 - 50
+        box_y2 = 720 - 50
+        box_x1 = box_x2 - text_width - (padding_x * 2)
+        box_y1 = box_y2 - text_height - (padding_y * 2)
 
-        # စာသားနောက်ခံမှာ Semi-transparent Box လေးထည့်ပေးခြင်းဖြင့် လုံးဝသဲသဲကွဲကွဲ မြင်ရစေမည်
+        # Semi-transparent Glass Box (ဖန်သားပြင်ကဲ့သို့ နောက်ခံလေး)
         box_layer = Image.new("RGBA", background.size, (0, 0, 0, 0))
         box_draw = ImageDraw.Draw(box_layer)
-        box_draw.rounded_rectangle([box_x1, box_y1, box_x2, box_y2], radius=15, fill=(0, 0, 0, 180))
+        
+        # Rounded Box ဆွဲခြင်း (Background အမည်းရောင် ပိုစိုပြီး အနားကွပ်လေးပါ ထည့်ခြင်း)
+        box_draw.rounded_rectangle(
+            [box_x1, box_y1, box_x2, box_y2], 
+            radius=12, 
+            fill=(15, 15, 20, 210), 
+            outline=(255, 255, 255, 60), 
+            width=2
+        )
         background = Image.alpha_composite(background.convert("RGBA"), box_layer).convert("RGB")
 
-        # စာသားကို Box ရဲ့ အလယ်တည့်တည့်တွင် ရေးဆွဲခြင်း
+        # စာသားကို Shadow လေးနဲ့အတူ ပိုပေါ်လွင်အောင် ရေးဆွဲခြင်း
         draw = ImageDraw.Draw(background)
-        text_x = box_x1 + padding
-        text_y = box_y1 + padding - 5
+        text_x = box_x1 + padding_x
+        text_y = box_y1 + padding_y - 2
         
-        # စာသားအရောင် တောက်တောက်နှင့် ထင်ရှားစေရန်
+        # Text Shadow (အရိပ်လေးထိုးပေးခြင်း)
+        draw.text((text_x + 2, text_y + 2), name_to_draw, font=font, fill=(0, 0, 0))
+        # Main Text (အဖြူရောင် တောက်တောက်)
         draw.text((text_x, text_y), name_to_draw, font=font, fill=(255, 255, 255))
         
+        # ပုံဟောင်းဖယ်ရှားခြင်း
         if os.path.exists(image_path):
             os.remove(image_path)
             
