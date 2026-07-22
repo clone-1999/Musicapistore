@@ -8,7 +8,7 @@ from pyrogram.types import Message
 from py_yt import VideosSearch, Playlist
 import aiohttp
 
-API_URL = os.environ.get("MusicSp_API_URL", "key-production-78aa.up.railway.app")
+API_URL = os.environ.get("MusicSp_API_URL", "http://key-production-78aa.up.railway.app")
 
 API_KEY = os.environ.get("MusicSp_API_KEY", "999coresapikey") 
 
