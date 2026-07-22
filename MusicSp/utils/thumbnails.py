@@ -88,11 +88,11 @@ async def gen_thumb(videoid: str):
         except Exception:
             font_credit = ImageFont.load_default()
 
-        credit_text = "@HANTHAR999"
+        credit_text = "999_CORES @HANTHAR999"
         
         # ညာဘက်အစွန်းမှ လုံလောက်သော ကွာဝေးချက် (x=1230) တွင် ထားရှိခြင်းဖြင့် တစ်ဝက်တစ်ပျက်ဖြစ်ခြင်းကို ကာကွယ်ပေးသည်
-        draw.text((1232, 662), credit_text, font=font_credit, fill=(0, 0, 0))
-        draw.text((1230, 660), credit_text, font=font_credit, fill=(255, 255, 255), anchor="rt")
+        draw.text((642, 662), credit_text, font=font_credit, fill=(0, 0, 0))
+        draw.text((640, 660), credit_text, font=font_credit, fill=(255, 255, 255), anchor="rt")
 
         if os.path.exists(image_path):
             os.remove(image_path)
