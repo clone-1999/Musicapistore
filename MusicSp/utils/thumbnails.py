@@ -1,8 +1,6 @@
-# ATLEAST GIVE CREDITS IF YOU STEALING :(((((((((((((((((((((((((((((((((((((
-# ELSE NO FURTHER PUBLIC THUMBNAIL UPDATES
-
 import logging
 import os
+import base64
 import aiofiles
 import aiohttp
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -54,13 +52,11 @@ async def gen_thumb(videoid: str):
             
         youtube = Image.open(image_path).convert("RGB")
         
-        # 1. နောက်ခံကို ပိုပြီး သိသိသာသာ ဝါးပေးခြင်း (Blur Background - 50 तक တိုးထားသည်)
         bg_img = changeImageSize(1280, 720, youtube)
         background = bg_img.filter(ImageFilter.GaussianBlur(50))
         darken = Image.new("RGBA", (1280, 720), (10, 10, 15, 190))
         background = Image.alpha_composite(background.convert("RGBA"), darken).convert("RGB")
 
-        # 2. အလယ်တည့်တည့်က ပုံနှင့် ဘောင်အဖြူ (White Border)
         target_w, target_h = 800, 450
         orig_w, orig_h = youtube.size
         
@@ -81,11 +77,9 @@ async def gen_thumb(videoid: str):
         pos_y = (720 - bordered_img.size[1]) // 2 - 20
         background.paste(bordered_img, (pos_x, pos_y))
 
-        # 3. System Font ကို တိုက်ရိုက်သုံးခြင်း (Assets မလိုတော့ပါ)
         draw = ImageDraw.Draw(background)
         font_credit = None
         
-        # Linux/Windows စနစ်များတွင် အများဆုံးပါတတ်သော System Fonts များကို အစဉ်လိုက် ရှာဖွေသုံးမည်
         font_paths = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
@@ -103,11 +97,19 @@ async def gen_thumb(videoid: str):
         if font_credit is None:
             font_credit = ImageFont.load_default()
 
-        credit_text = "999_CORES @HANTHAR999"
+        secret_code = "OTk5X0NPUkVTIEBIQU5USEE5OTk="
+        credit_text = base64.b64decode(secret_code).decode("utf-8")
         
-        # ညာဘက်အောက်ထောင့်တွင် စာသားပြတ်တောက်မှု မရှိစေရန် လှပစွာ ဖော်ပြခြင်း
-        draw.text((1232, 662), credit_text, font=font_credit, fill=(0, 0, 0))
-        draw.text((1230, 660), credit_text, font=font_credit, fill=(255, 255, 255), anchor="rt")
+        #
+        center_x = 1280 // 2
+        center_y = 720 // 2 + 20
+        
+        # 
+        draw.text((center_x + 2, center_y + 2), credit_text, font=font_credit, fill=(0, 0, 0), anchor="mm")
+        
+        
+        draw.text((center_x, center_y), credit_text, font=font_credit, fill=(255, 255, 255), anchor="mm")
+        # ----------------------------------------------------
 
         if os.path.exists(image_path):
             os.remove(image_path)
