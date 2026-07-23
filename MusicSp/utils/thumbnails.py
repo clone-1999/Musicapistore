@@ -98,7 +98,6 @@ async def gen_thumb(videoid: str):
 
         #
         secret_code = "U09VUkNFIC0gQEhBTlRIQVI5OTkgQENPUkVTXzk5OQ=="
- "
         credit_text = base64.b64decode(secret_code).decode("utf-8")
         
         
