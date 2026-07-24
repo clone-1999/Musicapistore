@@ -35,7 +35,7 @@ from MusicSp.utils.exceptions import AssistantErr
 from MusicSp.utils.formatters import check_duration, seconds_to_min, speed_converter
 from MusicSp.utils.inline.play import stream_markup
 from MusicSp.utils.stream.autoclear import auto_clean
-from MusicSp.utils.thumbnails import gen_thumb
+from MusicSp.utils.thumbnails import get_thumb
 from strings import get_string
 
 autoend = {}
